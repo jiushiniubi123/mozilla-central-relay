@@ -16,7 +16,7 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq mercurial
           hg --version
-          hg clone -U --timeout 7200 https://hg.mozilla.org/mozilla-central/ mc
+          hg clone -U https://hg.mozilla.org/mozilla-central/ mc
           hg -R mc log -r tip -T "{node}\n" > tip.txt
           cat tip.txt
 
