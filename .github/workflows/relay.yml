@@ -1,0 +1,42 @@
+name: relay
+on:
+  workflow_dispatch:
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghc /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Clone mozilla-central (store only)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq mercurial
+          hg --version
+          hg clone -U --timeout 7200 https://hg.mozilla.org/mozilla-central/ mc
+          hg -R mc log -r tip -T "{node}\n" > tip.txt
+          cat tip.txt
+
+      - name: Bundle and split
+        run: |
+          hg -R mc bundle -a --type zstd-v2 all.hg
+          ls -la all.hg
+          rm -rf mc
+          split -b 1400m -d all.hg all.hg.part-
+          rm all.hg
+          ls -la all.hg.part-*
+          df -h /
+
+      - name: Upload bundle parts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mc-bundle
+          path: |
+            all.hg.part-*
+            tip.txt
+          retention-days: 3
+          compression-level: 0
+          if-no-files-found: error
