@@ -1,0 +1,45 @@
+name: relay2
+on:
+  workflow_dispatch:
+
+jobs:
+  pkgcache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Install deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mercurial openjdk-17-jdk autoconf2.13 zip unzip
+          java -version 2>&1
+
+      - name: Clone mozilla-central at pinned rev
+        run: |
+          hg clone -U https://hg.mozilla.org/mozilla-central/ mc
+          hg -R mc update -C 46d93393954cc9ac31ab056e4278dd027eb1a534
+          hg -R mc log -r . -T "checked out {node}\n"
+
+      - name: Mozconfig (artifact mode)
+        run: |
+          cd mc
+          printf 'ac_add_options --enable-artifact-builds\nmk_add_options MOZ_OBJDIR=@TOPSRCDIR@/objdir-frontend\n' > mozconfig
+          cat mozconfig
+
+      - name: mach build (populate artifact cache)
+        env:
+          MOZBUILD_STATE_PATH: ${{ github.workspace }}/mozbuild
+        run: |
+          cd mc
+          ./mach configure || true
+          ./mach build || true
+          echo "--- package-frontend cache ---"
+          ls -la $GITHUB_WORKSPACE/mozbuild/package-frontend || true
+
+      - name: Upload package-frontend cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: mc-pkg-cache
+          path: mozbuild/package-frontend/*
+          retention-days: 3
+          compression-level: 0
+          if-no-files-found: error
